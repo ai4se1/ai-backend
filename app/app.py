@@ -19,7 +19,8 @@ model = AutoModelForCausalLM.from_pretrained(model_id, device_map=gpu, torch_dty
 async def highlight_code(prompt: Prompt):
     print(prompt)
     inputs = tokenizer(prompt.prompt, return_tensors="pt").to(model.device)
-    logits = model(**inputs).logits[0]
+    with torch.no_grad():
+        logits = model(**inputs).logits[0]
 
     differences = []
 
@@ -39,8 +40,6 @@ async def highlight_code(prompt: Prompt):
 
         token = prompt_tokens[j]
 
-        #prompt_tokens[j] =
-        #.replace("▁", " ")
         threshold = 0.2
         if last_dif <= threshold:
             token = token.replace("▁", " ")
