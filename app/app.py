@@ -11,7 +11,7 @@ app = FastAPI()
 
 # Load the fine-tuned language model and tokenizer
 gpu = torch.device('cuda:0')
-model_id = "google/codegemma-2b"
+model_id = "google/codegemma-1.1-2b"
 tokenizer = GemmaTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id, device_map=gpu, torch_dtype=torch.float16)
 
