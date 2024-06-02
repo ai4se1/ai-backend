@@ -109,6 +109,9 @@ Code to analyze:
 c++
 '''
 
+max_new_tokens = 1000
+context_window_size = 8000
+
 def recursive_prompting(counter, chat, prompt):
     print(f"Starting iteration: {counter}")
     if counter > 10:
@@ -119,12 +122,12 @@ def recursive_prompting(counter, chat, prompt):
         inputs = tokenizer(chat_prompt, return_tensors="pt").to(model.device)
 
     prompt_len = inputs["input_ids"].shape[-1]
-    if prompt_len > 8000:
+    if prompt_len > context_window_size - max_new_tokens:
         print("Context size exceeded!")
         return []
     print(f"Prompting with context length: {prompt_len}")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=1000)
+        outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
     result = tokenizer.decode(outputs[0][prompt_len:])
 
