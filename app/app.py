@@ -135,23 +135,25 @@ def recursive_prompting(counter, chat, prompt):
     processed_result = result.strip()[8:-8]
     print(f"Model generated: {len(result)} characters")
     result_json = []
-    try:
-        result_json = json.loads(processed_result)
-    except:
-        print(f"Json parsing failed: {processed_result}")
-        chat.append({"role" : "assistant", "content": result})
-        chat.append({"role" : "user", "content" : "Sorry the last answer you provided was not valid json. Could you output the last answer as valid json for me?"})
-        return recursive_prompting(counter + 1, chat, prompt)
+    result_json = json.loads(processed_result)
+    #except:
+    #    print(f"Json parsing failed: {processed_result}")
+    #    chat.append({"role" : "assistant", "content": result})
+    #    chat.append({"role" : "user", "content" : "Sorry the last answer you provided was not valid json. Could you output the last answer as valid json for me?"})
+    #    return recursive_prompting(counter + 1, chat, prompt)
     for finding in result_json:
         line_of_code = finding["problematic_line_of_code"]
         first_index = prompt.find(line_of_code)
         second_index = prompt.find(line_of_code, first_index +1)
+        finding["line_number"] = -1
         if second_index != -1:
+            continue
             print("Line of code is not unique")
             chat.append({"role" : "assistant", "content" : result})
             chat.append({"role" : "user", "content" : f"The following json object contains a problematic_line_of_code that is not unique: {finding}. Can you expand the problematic_line_of_code in your output so it is unique and still identifies the same bug while keeping all other json items untouched?"})
             return recursive_prompting(counter + 1, chat, prompt)
         if first_index == -1:
+            continue
             print("Line of code could not be found")
             chat.append({"role" : "assistant", "content" : result})
             chat.append({"role" : "user", "content" : f"We couldn't find the problematic_line_of_code within the source code for this json object: {finding}. Can you try a different problematic_line_of_code for this json object and output all the other json objects again?"})
