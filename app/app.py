@@ -22,30 +22,31 @@ Context: I have a codebase written in c++. I need to find lines that might conta
 
 Criteria for Identifying Potential Bugs:
 
-    Syntax Errors: Look for lines with syntax errors.
-    Logical Errors: Identify lines where the logic might be flawed (e.g., incorrect conditions, improper use of operators).
-    Runtime Errors: Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
-    Common Pitfalls: Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
-    Code Quality Issues: Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
+    1. **Syntax Errors:** Look for lines with syntax errors.
+    2. **Logical Errors:** Identify lines where the logic might be flawed (e.g., incorrect conditions, improper use of operators).
+    3. **Runtime Errors:** Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
+    4. **Common Pitfalls:** Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
+    5. **Code Quality Issues:** Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
 
 
 Instructions:
 
-    Analyze the provided codebase and identify lines that match the above criteria.
-    Make sure to check for edge cases and scenarios where the input might cause unexpected behavior.
-    Pay attention to lines with complex logic or multiple operations as they are more prone to errors.
-    For each identified line, provide a json object with the following fields:
-        problematic_line_of_code: The line of code as it is in the original source code. 
-        description: A description of the potential bug.
-        suggestion: A suggestion for how to fix or further investigate the issue.
-We want to use the problematic_line_of_code field to identify the line of code for further analysis. 
-We use the python find method for matching so please put substrings in this field that we can find this way.
+    1. Analyze the provided codebase and identify lines that match the above criteria.
+    2. Make sure to check for edge cases and scenarios where the input might cause unexpected behavior.
+    3. Pay attention to lines with complex logic or multiple operations as they are more prone to errors.
+    4. For each identified line, provide a json object with the following fields:
+        - problematic_line_of_code: The line of code as it is in the original source code. 
+        - description: A description of the potential bug.
+        - suggestion: A suggestion for how to fix or further investigate the issue.
+
+**Important**:
+- Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be matched using the Python `find` method.
+- Make sure each "description" and "suggestion" is relevant to the identified line of code.
 
 Here is an example of how the code could look like and what your response should be:
 
 Example1 - Code:
-c++
-
+```c++
 double calculate_average(std::vector<int> numbers) {
     int total = std::accumulate(numbers.begin(), numbers.end(), 0);
     int count = numbers.size();
@@ -55,20 +56,22 @@ double calculate_average(std::vector<int> numbers) {
 int get_element(std::vector<int> array, int index) {
     return array.at(index);
 }
+```
 
 Example1 - Response:
 
-json
-
+```json
 [{  problematic_line_of_code: "return total / static_cast<double>(count);",
     description: "Potential division by zero if numbers vector is empty",
     suggestion: "Add a check to ensure count is not zero before performing the division." },
     { problematic_line_of_code: "return array.at(index);",
     description: "Possible out-of-bound array access",
     suggestion: "Add a check to ensure the index is within the bounds of the array." }]
+```
 
 Example2 - Code:
-c++
+
+```c++
 int calculate_sum(std::vector<int> numbers) {
     int sum = 3;
     for (int j = 0; j <= numbers.size(); j++) {
@@ -76,17 +79,22 @@ int calculate_sum(std::vector<int> numbers) {
     }
     return sum;
 }
+```
 
 Example 2 - Response
+
+```json
 [{  problematic_line_of_code: "for (int j = 0; j <= numbers.size(); j++) {",
     description: "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
     suggestion: "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
     { problematic_line_of_code: "int sum = 3;",
     description: "It is unusual that the sum variable is initialized to a non-zero value.",
     suggestion: "Change the line to int sum = 0;"}]
+```
 
 Example3 - Code:
-c++
+
+```c++
 int calculate_sum(std::vector<int> numbers) {
     int sum = 0;
     for (int j = 0; j < numbers.size(); j++) {
@@ -94,11 +102,15 @@ int calculate_sum(std::vector<int> numbers) {
     }
     return sum;
 }
+```
 
 Example 3 - Response
+
+```json
 [{  problematic_line_of_code: "sum -= numbers[j];",
     description: "The operator -= is wrong to calculate a sum. It should be +=.",
     suggestion: "Change the operator to +=."}]
+```
     
 
 
@@ -106,7 +118,7 @@ Please review the code below and use the formatting of the example to provide yo
 
 Code to analyze:
 
-c++
+```c++
 '''
 
 max_new_tokens = 1000
@@ -168,7 +180,7 @@ def recursive_prompting(counter, chat, prompt):
 @app.post("/highlight-code/")
 async def highlight_code(prompt: Prompt):
     chat = [
-        { "role": "user", "content": new_prompt + prompt.prompt},
+        { "role": "user", "content": new_prompt + prompt.prompt + "\n```"},
     ]
     print(f"Handling prompt: {prompt.prompt}")
     result = recursive_prompting(0, chat, prompt.prompt)
