@@ -150,28 +150,60 @@ def recursive_prompting(counter, chat, prompt):
     processed_result = result.strip()[8:-8]
     print(f"Model generated: {len(result)} characters")
     result_json = []
-    result_json = json.loads(processed_result)
-    #except:
-    #    print(f"Json parsing failed: {processed_result}")
-    #    chat.append({"role" : "assistant", "content": result})
-    #    chat.append({"role" : "user", "content" : "Sorry the last answer you provided was not valid json. Could you output the last answer as valid json for me?"})
-    #    return recursive_prompting(counter + 1, chat, prompt)
+    try:
+        result_json = json.loads(processed_result)
+    except:
+        print(f"Json parsing failed: {processed_result}")
+        chat.append({"role" : "assistant", "content": result})
+        chat.append({"role" : "user", "content" : """
+It looks like the last output provided is not in the correct JSON format. Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
+
+```json
+[
+  {
+    "problematic_line_of_code": "<line of code>",
+    "description": "<description of the potential bug>",
+    "suggestion": "<suggestion for fixing or investigating the issue>"
+  },
+  ...
+]
+```
+
+Please try again with the code provided earlier, and ensure the output is formatted as valid JSON.
+"""})
+        return recursive_prompting(counter + 1, chat, prompt)
     for finding in result_json:
         line_of_code = finding["problematic_line_of_code"]
         first_index = prompt.find(line_of_code)
         second_index = prompt.find(line_of_code, first_index +1)
         finding["line_number"] = -1
         if second_index != -1:
-            continue
             print("Line of code is not unique")
             chat.append({"role" : "assistant", "content" : result})
-            chat.append({"role" : "user", "content" : f"The following json object contains a problematic_line_of_code that is not unique: {finding}. Can you expand the problematic_line_of_code in your output so it is unique and still identifies the same bug while keeping all other json items untouched?"})
+            chat.append({"role" : "user", "content" : f"""
+It seems that the problematic line of code of this json object is ambiguous within the code:
+```json
+{json.dumps(finding)}
+```
+
+Please make sure to clearly specify the problematic line by using an exact substring from the original code. This will help ensure that the identified lines are unambiguous and directly match the provided code.
+
+Please review the code provided earlier and generate the output again, ensuring that each "problematic_line_of_code" is an exact substring from the original code.
+"""})
             return recursive_prompting(counter + 1, chat, prompt)
         if first_index == -1:
-            continue
             print("Line of code could not be found")
             chat.append({"role" : "assistant", "content" : result})
-            chat.append({"role" : "user", "content" : f"We couldn't find the problematic_line_of_code within the source code for this json object: {finding}. Can you try a different problematic_line_of_code for this json object and output all the other json objects again?"})
+            chat.append({"role" : "user", "content" : f"""
+It appears that the identified lines of code in this json object does not exist in the original code provided:
+```json
+{json.dumps(finding)}
+```
+                         
+Please ensure that the "problematic_line_of_code" field contains exact lines or substrings that are present in the original code.
+
+Please analyze the code again and make sure that each identified "problematic_line_of_code" corresponds exactly to a line or substring from the original source code.
+"""})
             return recursive_prompting(counter + 1, chat, prompt)
         finding["line_number"] = prompt[:first_index].count("\n") + 1
     return result_json
