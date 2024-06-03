@@ -63,12 +63,12 @@ int get_element(std::vector<int> array, int index) {
 Example1 - Response:
 
 ```json
-[{  problematic_line_of_code: "return total / static_cast<double>(count);",
-    description: "Potential division by zero if numbers vector is empty",
-    suggestion: "Add a check to ensure count is not zero before performing the division." },
-    { problematic_line_of_code: "return array.at(index);",
-    description: "Possible out-of-bound array access",
-    suggestion: "Add a check to ensure the index is within the bounds of the array." }]
+[{  "problematic_line_of_code" : "return total / static_cast<double>(count);",
+    "description" : "Potential division by zero if numbers vector is empty",
+    "suggestion" : "Add a check to ensure count is not zero before performing the division." },
+    { "problematic_line_of_code" : "return array.at(index);",
+    "description" : "Possible out-of-bound array access",
+    "suggestion" : "Add a check to ensure the index is within the bounds of the array." }]
 ```
 
 Example2 - Code:
@@ -86,12 +86,12 @@ int calculate_sum(std::vector<int> numbers) {
 Example 2 - Response
 
 ```json
-[{  problematic_line_of_code: "for (int j = 0; j <= numbers.size(); j++) {",
-    description: "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
-    suggestion: "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
-    { problematic_line_of_code: "int sum = 3;",
-    description: "It is unusual that the sum variable is initialized to a non-zero value.",
-    suggestion: "Change the line to int sum = 0;"}]
+[{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {",
+    "description" : "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
+    "suggestion" : "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
+    { "problematic_line_of_code" : "int sum = 3;",
+    "description" : "It is unusual that the sum variable is initialized to a non-zero value.",
+    "suggestion" : "Change the line to int sum = 0;"}]
 ```
 
 Example3 - Code:
@@ -109,9 +109,9 @@ int calculate_sum(std::vector<int> numbers) {
 Example 3 - Response
 
 ```json
-[{  problematic_line_of_code: "sum -= numbers[j];",
-    description: "The operator -= is wrong to calculate a sum. It should be +=.",
-    suggestion: "Change the operator to +=."}]
+[{  "problematic_line_of_code" : "sum -= numbers[j];",
+    "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
+    "suggestion" : "Change the operator to +=."}]
 ```
     
 
@@ -125,7 +125,7 @@ Code to analyze:
 
 max_new_tokens = 1000
 context_window_size = 8000
-json_extraction_re = re.compile(r"```json\n(.*)\n```", re.DOTALL)
+json_extraction_re = re.compile(r"```json(.*)```", re.DOTALL)
 
 def recursive_prompting(counter, chat, prompt):
     print(f"Starting iteration: {counter}")
@@ -150,17 +150,15 @@ def recursive_prompting(counter, chat, prompt):
     del outputs
     torch.cuda.empty_cache()
 
-    processed_result = re.match(json_extraction_re, result).group(1)
     print(f"Model generated: {len(result)} characters")
-    print(f"Extracted JSON: {processed_result}")
+    print(f"Result: {result}")
     result_json = []
-    try:
-        result_json = json.loads(processed_result)
-    except:
-        print(f"Json parsing failed: {processed_result}")
+    matches = re.findall(json_extraction_re, result)
+    if len(matches) == 0:
+        print(f"Json extraction failed: {result}")
         chat.append({"role" : "assistant", "content": result})
         chat.append({"role" : "user", "content" : """
-It looks like the last output provided is not in the correct JSON format. Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
+It seems that the last output provided does not contain a valid JSON object. Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
 
 ```json
 [
@@ -169,6 +167,29 @@ It looks like the last output provided is not in the correct JSON format. Please
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
   },
+  ...
+]
+```
+
+Please try again with the code provided earlier, and ensure the output is formatted as valid JSON.
+"""})
+        return recursive_prompting(counter + 1, chat, prompt)
+    processed_result = matches[0]
+    try:
+        result_json = json.loads(processed_result)
+    except json.JSONDecodeError as e:
+        print(f"Json parsing failed: {processed_result}")
+        chat.append({"role" : "assistant", "content": result})
+        chat.append({"role" : "user", "content" : f"""
+It looks like the last output provided is not in the correct JSON format. Parsing the output failed with the following exception: {e} Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
+
+```json
+[
+  {{
+    "problematic_line_of_code": "<line of code>",
+    "description": "<description of the potential bug>",
+    "suggestion": "<suggestion for fixing or investigating the issue>"
+  }},
   ...
 ]
 ```
