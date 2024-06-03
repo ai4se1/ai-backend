@@ -3,6 +3,7 @@ from transformers import GemmaTokenizer, AutoModelForCausalLM, AutoTokenizer
 import torch
 from pydantic import BaseModel
 import json
+import re
 
 
 class Prompt(BaseModel):
@@ -42,6 +43,7 @@ Instructions:
 **Important**:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be matched using the Python `find` method.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
+- Do not output anything but the json objects for each identified line of code.
 
 Here is an example of how the code could look like and what your response should be:
 
@@ -123,6 +125,7 @@ Code to analyze:
 
 max_new_tokens = 1000
 context_window_size = 8000
+json_extraction_re = re.compile(r"```json\n(.*)\n```", re.DOTALL)
 
 def recursive_prompting(counter, chat, prompt):
     print(f"Starting iteration: {counter}")
@@ -147,8 +150,9 @@ def recursive_prompting(counter, chat, prompt):
     del outputs
     torch.cuda.empty_cache()
 
-    processed_result = result.strip()[8:-8]
+    processed_result = re.match(json_extraction_re, result).group(1)
     print(f"Model generated: {len(result)} characters")
+    print(f"Extracted JSON: {processed_result}")
     result_json = []
     try:
         result_json = json.loads(processed_result)
