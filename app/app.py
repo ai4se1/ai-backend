@@ -17,6 +17,7 @@ model_id = "google/codegemma-1.1-7b-it"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id, device_map=gpu, torch_dtype=torch.bfloat16)
 new_prompt = '''
+# Task description
 Objective: Identify lines of code that might contain bugs.
 
 Context: I have a codebase written in c++. I need to find lines that might contain bugs based on specific criteria.
@@ -36,18 +37,22 @@ Instructions:
     2. Make sure to check for edge cases and scenarios where the input might cause unexpected behavior.
     3. Pay attention to lines with complex logic or multiple operations as they are more prone to errors.
     4. For each identified line, provide a json object with the following fields:
-        - problematic_line_of_code: The line of code as it is in the original source code. 
+        - problematic_line_of_code: A substring of the original source code that contains the bug and is unique within the source code. 
         - description: A description of the potential bug.
         - suggestion: A suggestion for how to fix or further investigate the issue.
 
 **Important**:
-- Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be matched using the Python `find` method.
+- Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
+- For multiline substrings, make sure to preserve the exact indentation and line breaks from the original code.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
 - Do not output anything but the json objects for each identified line of code.
 
-Here is an example of how the code could look like and what your response should be:
+# Examples
+Here are examples of how the code could look like and what your response should be:
 
-Example1 - Code:
+## Example1
+
+Code:
 ```c++
 double calculate_average(std::vector<int> numbers) {
     int total = std::accumulate(numbers.begin(), numbers.end(), 0);
@@ -59,20 +64,19 @@ int get_element(std::vector<int> array, int index) {
     return array.at(index);
 }
 ```
-
-Example1 - Response:
-
+Response:
 ```json
-[{  "problematic_line_of_code" : "return total / static_cast<double>(count);",
+[{  "problematic_line_of_code" : "return total / static_cast<double>(count);\\n}",
     "description" : "Potential division by zero if numbers vector is empty",
     "suggestion" : "Add a check to ensure count is not zero before performing the division." },
-    { "problematic_line_of_code" : "return array.at(index);",
+    { "problematic_line_of_code" : "return array.at(index);\\n}",
     "description" : "Possible out-of-bound array access",
     "suggestion" : "Add a check to ensure the index is within the bounds of the array." }]
 ```
 
-Example2 - Code:
+## Example2
 
+Code:
 ```c++
 int calculate_sum(std::vector<int> numbers) {
     int sum = 3;
@@ -81,22 +85,42 @@ int calculate_sum(std::vector<int> numbers) {
     }
     return sum;
 }
+
+int calculate_product(std::vector<int> numbers) {
+    int product = 1;
+    for (int j = 0; j < numbers.size(); j++) {
+        product /= numbers[i];
+    }
+    return product;
+}
 ```
 
-Example 2 - Response
-
+Response:
 ```json
-[{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {",
+[{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {\\n        sum += numbers[j];",
     "description" : "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
     "suggestion" : "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
     { "problematic_line_of_code" : "int sum = 3;",
     "description" : "It is unusual that the sum variable is initialized to a non-zero value.",
-    "suggestion" : "Change the line to int sum = 0;"}]
+    "suggestion" : "Change the line to int sum = 0;"},
+    { "problematic_line_of_code" : "product /= numbers[i];",
+    "description" : "The operator /= is wrong to calculate a product. It should be *=.",
+    "suggestion" : "Change the operator to *=."}]
 ```
 
-Example3 - Code:
+## Example3
 
+Code:
 ```c++
+int calculate_sum_squared(std::vector<int> numbers) {
+    int sum = 0;
+    for (int j = 0; j < numbers.size(); j++) {
+        sum -= numbers[j];
+        sum *= sum;
+    }
+    return sum;
+}
+
 int calculate_sum(std::vector<int> numbers) {
     int sum = 0;
     for (int j = 0; j < numbers.size(); j++) {
@@ -104,32 +128,42 @@ int calculate_sum(std::vector<int> numbers) {
     }
     return sum;
 }
+
+int calculate_product(std::vector<int> numbers) {
+    int product = 1;
+    for (int j = 0; j < numbers.size(); j++) {
+        product *= numbers[i];
+    }
+    return product;
+}
 ```
 
-Example 3 - Response
-
+Response:
 ```json
-[{  "problematic_line_of_code" : "sum -= numbers[j];",
+[{  "problematic_line_of_code" : "sum -= numbers[j];\\n    }",
+    "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
+    "suggestion" : "Change the operator to +=."},
+    {"problematic_line_of_code" : "sum -= numbers[j];\\n        sum *= sum;",
     "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
     "suggestion" : "Change the operator to +=."}]
 ```
-    
 
+# Your Task
 
-Please review the code below and use the formatting of the example to provide your response.
+Please review the code below and use the formatting of the examples to provide your response as a list of JSON objects.
 
-Code to analyze:
-
+Code:
 ```c++
 '''
 
-max_new_tokens = 1000
+max_new_tokens = 1500
 context_window_size = 8000
+recursion_depth = 3
 json_extraction_re = re.compile(r"```json(.*)```", re.DOTALL)
 
 def recursive_prompting(counter, chat, prompt):
-    print(f"Starting iteration: {counter}")
-    if counter > 10:
+    print(f"Starting iteration:\n{counter}\n<eol>")
+    if counter > recursion_depth:
         print("Recursion depth exceeded")
         return []
     with torch.no_grad():
@@ -140,7 +174,7 @@ def recursive_prompting(counter, chat, prompt):
     if prompt_len > context_window_size - max_new_tokens:
         print("Context size exceeded!")
         return []
-    print(f"Prompting with context length: {prompt_len}")
+    print(f"Prompting with context length:\n{prompt_len}<eol>")
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
@@ -150,12 +184,11 @@ def recursive_prompting(counter, chat, prompt):
     del outputs
     torch.cuda.empty_cache()
 
-    print(f"Model generated: {len(result)} characters")
-    print(f"Result: {result}")
+    print(f"Result:\n{result}\n<eol>")
     result_json = []
     matches = re.findall(json_extraction_re, result)
     if len(matches) == 0:
-        print(f"Json extraction failed: {result}")
+        print(f"Json extraction failed:\n{result}\n<eol>")
         chat.append({"role" : "assistant", "content": result})
         chat.append({"role" : "user", "content" : """
 It seems that the last output provided does not contain a valid JSON object. Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
@@ -167,18 +200,17 @@ It seems that the last output provided does not contain a valid JSON object. Ple
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
   },
-  ...
 ]
 ```
 
-Please try again with the code provided earlier, and ensure the output is formatted as valid JSON.
+Please try again to generate a JSON object for each line that might contain bugs in the code provided earlier, and ensure the output is formatted as valid JSON for all the items.
 """})
         return recursive_prompting(counter + 1, chat, prompt)
     processed_result = matches[0]
     try:
         result_json = json.loads(processed_result)
     except json.JSONDecodeError as e:
-        print(f"Json parsing failed: {processed_result}")
+        print(f"Json parsing failed:\n{processed_result}\n<eol>")
         chat.append({"role" : "assistant", "content": result})
         chat.append({"role" : "user", "content" : f"""
 It looks like the last output provided is not in the correct JSON format. Parsing the output failed with the following exception: {e} Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
@@ -190,20 +222,18 @@ It looks like the last output provided is not in the correct JSON format. Parsin
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
   }},
-  ...
 ]
 ```
 
-Please try again with the code provided earlier, and ensure the output is formatted as valid JSON.
+Please try again with the code provided earlier, and ensure the output is formatted as valid JSON for all the items.
 """})
         return recursive_prompting(counter + 1, chat, prompt)
     for finding in result_json:
         line_of_code = finding["problematic_line_of_code"]
         first_index = prompt.find(line_of_code)
         second_index = prompt.find(line_of_code, first_index +1)
-        finding["line_number"] = -1
         if second_index != -1:
-            print("Line of code is not unique")
+            print(f"Line of code is not unique:\n{finding['problematic_line_of_code']}\n<eol>")
             chat.append({"role" : "assistant", "content" : result})
             chat.append({"role" : "user", "content" : f"""
 It seems that the problematic line of code of this json object is ambiguous within the code:
@@ -211,21 +241,24 @@ It seems that the problematic line of code of this json object is ambiguous with
 {json.dumps(finding)}
 ```
 
-Please make sure to clearly specify the problematic line by using an exact substring from the original code. This will help ensure that the identified lines are unambiguous and directly match the provided code.
+The python method `find` returned {first_index} and {second_index} for the substring {finding['problematic_line_of_code']} in the original code. This indicates that the substring is not unique in the code.
+
+Please make sure to clearly specify the problematic line by using an exact substring from the original code. You can also use multiline substrings if this is necessary to identify the line of code. This will help ensure that the identified lines are unambiguous and directly match the provided code.
 
 Please review the code provided earlier and generate the output again, ensuring that each "problematic_line_of_code" is an exact substring from the original code.
 """})
             return recursive_prompting(counter + 1, chat, prompt)
         if first_index == -1:
-            print("Line of code could not be found")
+            print(f"Line of code could not be found {finding['problematic_line_of_code']}")
             chat.append({"role" : "assistant", "content" : result})
             chat.append({"role" : "user", "content" : f"""
-It appears that the identified lines of code in this json object does not exist in the original code provided:
+It appears that the identified substring in the "problematic_line_of_code" field in this json object does not exist in the original code provided:
 ```json
 {json.dumps(finding)}
 ```
                          
 Please ensure that the "problematic_line_of_code" field contains exact lines or substrings that are present in the original code.
+Make sure that indentation, line breaks, and other formatting are preserved to match the original code structure.
 
 Please analyze the code again and make sure that each identified "problematic_line_of_code" corresponds exactly to a line or substring from the original source code.
 """})
