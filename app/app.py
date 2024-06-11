@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from transformers import GemmaTokenizer, AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from pydantic import BaseModel
 import json
@@ -8,7 +8,8 @@ import copy
 
 
 class Prompt(BaseModel):
-    prompt: str
+    code: str
+    language: str
 
 app = FastAPI()
 
@@ -21,7 +22,7 @@ new_prompt = '''
 # Task description
 Objective: Identify lines of code that might contain bugs.
 
-Context: I have a codebase written in c++. I need to find lines that might contain bugs based on specific criteria.
+Context: I have a codebase and I need to find lines that might contain bugs based on specific criteria.
 
 Criteria for Identifying Potential Bugs:
 
@@ -30,7 +31,6 @@ Criteria for Identifying Potential Bugs:
     3. **Runtime Errors:** Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
     4. **Common Pitfalls:** Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
     5. **Code Quality Issues:** Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
-
 
 Instructions:
 
@@ -44,7 +44,6 @@ Instructions:
 
 **Important**:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
-- For multiline substrings, make sure to preserve the exact indentation and line breaks from the original code.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
 - Do not output anything but the json objects for each identified line of code.
 
@@ -54,31 +53,36 @@ Here are examples of how the code could look like and what your response should 
 ## Example1
 
 Code:
-```c++
-double calculate_average(std::vector<int> numbers) {
-    int total = std::accumulate(numbers.begin(), numbers.end(), 0);
-    int count = numbers.size();
-    return total / static_cast<double>(count);
-}
+```python
+def calculate_average(numbers):
+    total = sum(numbers)
+    count = len(numbers)
+    return total / float(count)
 
-int get_element(std::vector<int> array, int index) {
-    return array.at(index);
-}
+def get_element(array, index):
+    return array[index]
 ```
+
 Response:
 ```json
-[{  "problematic_line_of_code" : "return total / static_cast<double>(count);",
-    "description" : "Potential division by zero if numbers vector is empty",
-    "suggestion" : "Add a check to ensure count is not zero before performing the division." },
-    { "problematic_line_of_code" : "return array.at(index);",
-    "description" : "Possible out-of-bound array access",
-    "suggestion" : "Add a check to ensure the index is within the bounds of the array." }]
+[
+    {
+        "problematic_line_of_code": "return total / float(count)",
+        "description": "Potential division by zero if numbers list is empty",
+        "suggestion": "Add a check to ensure count is not zero before performing the division."
+    },
+    {
+        "problematic_line_of_code": "return array[index]",
+        "description": "Possible out-of-bound list access",
+        "suggestion": "Add a check to ensure the index is within the bounds of the list."
+    }
+]
 ```
 
 ## Example2
 
 Code:
-```c++
+```cpp
 int calculate_sum(std::vector<int> numbers) {
     int sum = 3;
     for (int j = 0; j <= numbers.size(); j++) {
@@ -112,7 +116,53 @@ Response:
 ## Example3
 
 Code:
-```c++
+```java
+import java.util.HashMap;
+
+public class MapOperations {
+    public int getValue(HashMap<String, Integer> map, String key) {
+        return map.get(key);
+    }
+
+    public void incrementValue(HashMap<String, Integer> map, String key) {
+        int value = map.get(key);
+        value += 1;
+        map.put(key, value);
+    }
+
+    public void removeKeyIfExists(HashMap<String, Integer> map, String key) {
+        if (map.get(key) != null) {
+            map.remove(key);
+        }
+    }
+}
+```
+
+Response:
+```json
+[
+    {
+        "problematic_line_of_code": "return map.get(key);",
+        "description": "This may return null if the key does not exist, which may cause a NullPointerException in caller code.",
+        "suggestion": "Consider checking if the key exists before returning or return a default value."
+    },
+    {
+        "problematic_line_of_code": "int value = map.get(key);",
+        "description": "If the key does not exist, map.get(key) returns null, causing a NullPointerException when unboxing to int.",
+        "suggestion": "Check if the key exists and initialize value properly."
+    },
+    {
+        "problematic_line_of_code": "if (map.get(key) != null)",
+        "description": "A more efficient check for key existence is map.containsKey(key).",
+        "suggestion": "Change the condition to if (map.containsKey(key))."
+    }
+]
+```
+
+## Example4
+
+Code:
+```cpp
 int calculate_sum_squared(std::vector<int> numbers) {
     int sum = 0;
     for (int j = 0; j < numbers.size(); j++) {
@@ -154,7 +204,7 @@ Response:
 Please review the code below and use the formatting of the examples to provide your response as a list of JSON objects.
 
 Code:
-```c++
+```
 '''
 
 max_new_tokens = 1500
@@ -264,10 +314,10 @@ Please analyze the code again and make sure that each identified "problematic_li
 @app.post("/highlight-code/")
 async def highlight_code(prompt: Prompt):
     chat = [
-        { "role": "user", "content": new_prompt + prompt.prompt + "\n```"},
+        { "role": "user", "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```"},
     ]
-    print(f"Handling prompt: {prompt.prompt}")
-    result = recursive_prompting(0, chat, prompt.prompt)
+    print(f"Handling prompt: {prompt.code}")
+    result = recursive_prompting(0, chat, prompt.code)
     return result
 
 
