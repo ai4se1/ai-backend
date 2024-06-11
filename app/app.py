@@ -4,6 +4,7 @@ import torch
 from pydantic import BaseModel
 import json
 import re
+import copy
 
 
 class Prompt(BaseModel):
@@ -66,10 +67,10 @@ int get_element(std::vector<int> array, int index) {
 ```
 Response:
 ```json
-[{  "problematic_line_of_code" : "return total / static_cast<double>(count);\\n}",
+[{  "problematic_line_of_code" : "return total / static_cast<double>(count);",
     "description" : "Potential division by zero if numbers vector is empty",
     "suggestion" : "Add a check to ensure count is not zero before performing the division." },
-    { "problematic_line_of_code" : "return array.at(index);\\n}",
+    { "problematic_line_of_code" : "return array.at(index);",
     "description" : "Possible out-of-bound array access",
     "suggestion" : "Add a check to ensure the index is within the bounds of the array." }]
 ```
@@ -97,7 +98,7 @@ int calculate_product(std::vector<int> numbers) {
 
 Response:
 ```json
-[{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {\\n        sum += numbers[j];",
+[{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {",
     "description" : "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
     "suggestion" : "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
     { "problematic_line_of_code" : "int sum = 3;",
@@ -140,10 +141,10 @@ int calculate_product(std::vector<int> numbers) {
 
 Response:
 ```json
-[{  "problematic_line_of_code" : "sum -= numbers[j];\\n    }",
+[{  "problematic_line_of_code" : "sum -= numbers[j];",
     "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
     "suggestion" : "Change the operator to +=."},
-    {"problematic_line_of_code" : "sum -= numbers[j];\\n        sum *= sum;",
+    {"problematic_line_of_code" : "sum -= numbers[j];",
     "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
     "suggestion" : "Change the operator to +=."}]
 ```
@@ -228,27 +229,21 @@ It looks like the last output provided is not in the correct JSON format. Parsin
 Please try again with the code provided earlier, and ensure the output is formatted as valid JSON for all the items.
 """})
         return recursive_prompting(counter + 1, chat, prompt)
+
+    return_values = []
     for finding in result_json:
         line_of_code = finding["problematic_line_of_code"]
-        first_index = prompt.find(line_of_code)
-        second_index = prompt.find(line_of_code, first_index +1)
-        if second_index != -1:
-            print(f"Line of code is not unique:\n{finding['problematic_line_of_code']}\n<eol>")
-            chat.append({"role" : "assistant", "content" : result})
-            chat.append({"role" : "user", "content" : f"""
-It seems that the problematic line of code of this json object is ambiguous within the code:
-```json
-{json.dumps(finding)}
-```
+        prompt = str(prompt)
+        first_index = 0
+        while first_index != -1:
+            first_index = prompt.find(line_of_code, first_index)
+            if first_index != -1:
+                finding_copy = copy.deepcopy(finding)
+                finding_copy["line_number"] = prompt[:first_index].count("\n") + 1
+                return_values.append(finding_copy)
+                first_index += 1 
 
-The python method `find` returned {first_index} and {second_index} for the substring {finding['problematic_line_of_code']} in the original code. This indicates that the substring is not unique in the code.
-
-Please make sure to clearly specify the problematic line by using an exact substring from the original code. You can also use multiline substrings if this is necessary to identify the line of code. This will help ensure that the identified lines are unambiguous and directly match the provided code.
-
-Please review the code provided earlier and generate the output again, ensuring that each "problematic_line_of_code" is an exact substring from the original code.
-"""})
-            return recursive_prompting(counter + 1, chat, prompt)
-        if first_index == -1:
+        if prompt.find(line_of_code) == -1:
             print(f"Line of code could not be found {finding['problematic_line_of_code']}")
             chat.append({"role" : "assistant", "content" : result})
             chat.append({"role" : "user", "content" : f"""
@@ -263,8 +258,7 @@ Make sure that indentation, line breaks, and other formatting are preserved to m
 Please analyze the code again and make sure that each identified "problematic_line_of_code" corresponds exactly to a line or substring from the original source code.
 """})
             return recursive_prompting(counter + 1, chat, prompt)
-        finding["line_number"] = prompt[:first_index].count("\n") + 1
-    return result_json
+    return return_values
 
 
 @app.post("/highlight-code/")
