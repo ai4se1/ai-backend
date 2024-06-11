@@ -307,7 +307,11 @@ Make sure that indentation, line breaks, and other formatting are preserved to m
 
 Please analyze the code again and make sure that each identified "problematic_line_of_code" corresponds exactly to a line or substring from the original source code.
 """})
-            return recursive_prompting(counter + 1, chat, prompt)
+            result = recursive_prompting(counter + 1, chat, prompt)
+            counter += 1
+            if len(result) > 0:
+                return result
+    
     return return_values
 
 
