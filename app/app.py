@@ -282,6 +282,8 @@ Please try again with the code provided earlier, and ensure the output is format
 
     return_values = []
     for finding in result_json:
+        if "problematic_line_of_code" not in finding:
+            continue
         line_of_code = finding["problematic_line_of_code"]
         prompt = str(prompt)
         first_index = 0
@@ -290,6 +292,10 @@ Please try again with the code provided earlier, and ensure the output is format
             if first_index != -1:
                 finding_copy = copy.deepcopy(finding)
                 finding_copy["line_number"] = prompt[:first_index].count("\n") + 1
+                if "description" not in finding_copy:
+                    finding_copy["description"] = ""
+                if "suggestion" not in finding_copy:
+                    finding_copy["suggestion"] = ""
                 return_values.append(finding_copy)
                 first_index += 1 
 
