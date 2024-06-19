@@ -21,6 +21,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(
     model_id, device_map=gpu, torch_dtype=torch.bfloat16
 )
+request_counter=0
 new_prompt = """
 # Task description
 Objective: Identify lines of code that might contain bugs.
@@ -214,7 +215,6 @@ max_new_tokens = 1500
 context_window_size = 8000
 recursion_depth = 3
 json_extraction_re = re.compile(r"```json(.*)```", re.DOTALL)
-request_counter = 0
 
 
 def recursive_prompting(counter, chat, prompt):
@@ -359,7 +359,8 @@ async def highlight_code(prompt: Prompt):
             "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```",
         },
     ]
-    print(f"Handling prompt {request_counter} with\nCODE:{prompt.code}CODE")
+    global request_counter
+    print(f'Handling prompt {request_counter} with\nCODE:{prompt.code}CODE')
     request_counter += 1
     result = recursive_prompting(0, chat, prompt.code)
     print(f"RESULT: {json.dumps(result)} RESULT")
