@@ -214,10 +214,11 @@ max_new_tokens = 1500
 context_window_size = 8000
 recursion_depth = 3
 json_extraction_re = re.compile(r"```json(.*)```", re.DOTALL)
+request_counter = 0
 
 
 def recursive_prompting(counter, chat, prompt):
-    print(f"Starting iteration:\n{counter}\n<eol>")
+    print(f"ITERATION: {counter}\n")
     if counter > recursion_depth:
         print("Recursion depth exceeded")
         return []
@@ -229,7 +230,7 @@ def recursive_prompting(counter, chat, prompt):
 
     prompt_len = inputs["input_ids"].shape[-1]
     if prompt_len > context_window_size - max_new_tokens:
-        print("Context size exceeded!")
+        print("Context size exceeded")
         return []
     print(f"Prompting with context length:\n{prompt_len}<eol>")
     with torch.no_grad():
@@ -241,11 +242,11 @@ def recursive_prompting(counter, chat, prompt):
     del outputs
     torch.cuda.empty_cache()
 
-    print(f"Result:\n{result}\n<eol>")
+    print(f"RESULT:\n{result}\nRESULT")
     result_json = []
     matches = re.findall(json_extraction_re, result)
     if len(matches) == 0:
-        print(f"Json extraction failed:\n{result}\n<eol>")
+        print(f"JSON extraction failed:\n{result}\nJSON END")
         chat.append({"role": "assistant", "content": result})
         chat.append(
             {
@@ -272,7 +273,7 @@ Please try again to generate a JSON object for each line that might contain bugs
     try:
         result_json = json.loads(processed_result)
     except json.JSONDecodeError as e:
-        print(f"Json parsing failed:\n{processed_result}\n<eol>")
+        print(f"JSON parsing failed:\n{processed_result}\nJSON END")
         chat.append({"role": "assistant", "content": result})
         chat.append(
             {
@@ -298,13 +299,11 @@ Please try again with the code provided earlier, and ensure the output is format
 
     return_values = []
     if not isinstance(result_json, list):
-        print(f"Result is not a list:\n{result_json}\n<eol>")
+        print(f"Result is not a list:\n{result_json}\n JSON END")
         result_json = [result_json]
-    else:
-        print(f"Result is a list:\n{result_json}\n<eol>")
     for finding in result_json:
         if "problematic_line_of_code" not in finding:
-            print(f"Problematic line of code not found in finding")
+            print(f"Problematic line of code not found in finding {finding}")
             continue
         line_of_code = finding["problematic_line_of_code"]
         prompt = str(prompt)
@@ -342,11 +341,12 @@ Please analyze the code again and make sure that each identified "problematic_li
 """,
                 }
             )
-            print("did not find line of code")
             result = recursive_prompting(counter + 1, chat, prompt)
             counter += 1
             if len(result) > 0:
+                print("Using recursion!")
                 return result
+            print("Discarding recursion!")
 
     return return_values
 
@@ -359,9 +359,10 @@ async def highlight_code(prompt: Prompt):
             "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```",
         },
     ]
-    print(f"Handling prompt: {prompt.code}")
-    print(f"recursion_depth: {recursion_depth}")
+    print(f"Handling prompt {request_counter} with\nCODE:{prompt.code}CODE")
+    request_counter += 1
     result = recursive_prompting(0, chat, prompt.code)
+    print(f"RESULT: {json.dumps(result)} RESULT")
     return result
 
 
