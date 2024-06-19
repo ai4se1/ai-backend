@@ -298,7 +298,10 @@ Please try again with the code provided earlier, and ensure the output is format
 
     return_values = []
     if not isinstance(result_json, list):
+        print(f"Result is not a list:\n{result_json}\n<eol>")
         result_json = [result_json]
+    else:
+        print(f"Result is a list:\n{result_json}\n<eol>")
     for finding in result_json:
         if "problematic_line_of_code" not in finding:
             print(f"Problematic line of code not found in finding")
