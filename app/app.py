@@ -11,14 +11,17 @@ class Prompt(BaseModel):
     code: str
     language: str
 
+
 app = FastAPI()
 
 # Load the fine-tuned language model and tokenizer
-gpu = torch.device('cuda:0')
+gpu = torch.device("cuda:0")
 model_id = "google/codegemma-1.1-7b-it"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForCausalLM.from_pretrained(model_id, device_map=gpu, torch_dtype=torch.bfloat16)
-new_prompt = '''
+model = AutoModelForCausalLM.from_pretrained(
+    model_id, device_map=gpu, torch_dtype=torch.bfloat16
+)
+new_prompt = """
 # Task description
 Objective: Identify lines of code that might contain bugs.
 
@@ -205,12 +208,13 @@ Please review the code below and use the formatting of the examples to provide y
 
 Code:
 ```
-'''
+"""
 
 max_new_tokens = 1500
 context_window_size = 8000
 recursion_depth = 3
 json_extraction_re = re.compile(r"```json(.*)```", re.DOTALL)
+
 
 def recursive_prompting(counter, chat, prompt):
     print(f"Starting iteration:\n{counter}\n<eol>")
@@ -218,7 +222,9 @@ def recursive_prompting(counter, chat, prompt):
         print("Recursion depth exceeded")
         return []
     with torch.no_grad():
-        chat_prompt = tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
+        chat_prompt = tokenizer.apply_chat_template(
+            chat, tokenize=False, add_generation_prompt=True
+        )
         inputs = tokenizer(chat_prompt, return_tensors="pt").to(model.device)
 
     prompt_len = inputs["input_ids"].shape[-1]
@@ -240,8 +246,11 @@ def recursive_prompting(counter, chat, prompt):
     matches = re.findall(json_extraction_re, result)
     if len(matches) == 0:
         print(f"Json extraction failed:\n{result}\n<eol>")
-        chat.append({"role" : "assistant", "content": result})
-        chat.append({"role" : "user", "content" : """
+        chat.append({"role": "assistant", "content": result})
+        chat.append(
+            {
+                "role": "user",
+                "content": """
 It seems that the last output provided does not contain a valid JSON object. Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
 
 ```json
@@ -255,15 +264,20 @@ It seems that the last output provided does not contain a valid JSON object. Ple
 ```
 
 Please try again to generate a JSON object for each line that might contain bugs in the code provided earlier, and ensure the output is formatted as valid JSON for all the items.
-"""})
+""",
+            }
+        )
         return recursive_prompting(counter + 1, chat, prompt)
     processed_result = matches[0]
     try:
         result_json = json.loads(processed_result)
     except json.JSONDecodeError as e:
         print(f"Json parsing failed:\n{processed_result}\n<eol>")
-        chat.append({"role" : "assistant", "content": result})
-        chat.append({"role" : "user", "content" : f"""
+        chat.append({"role": "assistant", "content": result})
+        chat.append(
+            {
+                "role": "user",
+                "content": f"""
 It looks like the last output provided is not in the correct JSON format. Parsing the output failed with the following exception: {e} Please ensure that the response is a JSON array of objects, where each object contains the fields "problematic_line_of_code", "description", and "suggestion". The JSON format should look like this:
 
 ```json
@@ -277,12 +291,15 @@ It looks like the last output provided is not in the correct JSON format. Parsin
 ```
 
 Please try again with the code provided earlier, and ensure the output is formatted as valid JSON for all the items.
-"""})
+""",
+            }
+        )
         return recursive_prompting(counter + 1, chat, prompt)
 
     return_values = []
     for finding in result_json:
         if "problematic_line_of_code" not in finding:
+            print(f"Problematic line of code not found in finding: {finding}")
             continue
         line_of_code = finding["problematic_line_of_code"]
         prompt = str(prompt)
@@ -297,12 +314,17 @@ Please try again with the code provided earlier, and ensure the output is format
                 if "suggestion" not in finding_copy:
                     finding_copy["suggestion"] = ""
                 return_values.append(finding_copy)
-                first_index += 1 
+                first_index += 1
 
         if prompt.find(line_of_code) == -1:
-            print(f"Line of code could not be found {finding['problematic_line_of_code']}")
-            chat.append({"role" : "assistant", "content" : result})
-            chat.append({"role" : "user", "content" : f"""
+            print(
+                f"Line of code could not be found {finding['problematic_line_of_code']}"
+            )
+            chat.append({"role": "assistant", "content": result})
+            chat.append(
+                {
+                    "role": "user",
+                    "content": f"""
 It appears that the identified substring in the "problematic_line_of_code" field in this json object does not exist in the original code provided:
 ```json
 {json.dumps(finding)}
@@ -312,25 +334,33 @@ Please ensure that the "problematic_line_of_code" field contains exact lines or 
 Make sure that indentation, line breaks, and other formatting are preserved to match the original code structure.
 
 Please analyze the code again and make sure that each identified "problematic_line_of_code" corresponds exactly to a line or substring from the original source code.
-"""})
+""",
+                }
+            )
+            print("did not find line of code")
             result = recursive_prompting(counter + 1, chat, prompt)
             counter += 1
             if len(result) > 0:
                 return result
-    
+
     return return_values
 
 
 @app.post("/highlight-code/")
 async def highlight_code(prompt: Prompt):
     chat = [
-        { "role": "user", "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```"},
+        {
+            "role": "user",
+            "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```",
+        },
     ]
     print(f"Handling prompt: {prompt.code}")
+    print(f"recursion_depth: {recursion_depth}")
     result = recursive_prompting(0, chat, prompt.code)
     return result
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
