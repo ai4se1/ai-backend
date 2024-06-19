@@ -297,9 +297,11 @@ Please try again with the code provided earlier, and ensure the output is format
         return recursive_prompting(counter + 1, chat, prompt)
 
     return_values = []
+    if not isinstance(result_json, list):
+        result_json = [result_json]
     for finding in result_json:
         if "problematic_line_of_code" not in finding:
-            print(f"Problematic line of code not found in finding: {finding}")
+            print(f"Problematic line of code not found in finding")
             continue
         line_of_code = finding["problematic_line_of_code"]
         prompt = str(prompt)
