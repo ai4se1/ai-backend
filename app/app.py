@@ -242,7 +242,7 @@ def recursive_prompting(counter, chat, prompt):
     del outputs
     torch.cuda.empty_cache()
 
-    print(f"RESULT:\n{result}\nRESULT")
+    print(f"OUTPUT{counter}:\n{result}\nOUTPUT_END{counter}")
     result_json = []
     matches = re.findall(json_extraction_re, result)
     if len(matches) == 0:
@@ -363,7 +363,7 @@ async def highlight_code(prompt: Prompt):
     print(f'Handling prompt {request_counter} with\nCODE:{prompt.code}CODE')
     request_counter += 1
     result = recursive_prompting(0, chat, prompt.code)
-    print(f"RESULT: {json.dumps(result)} RESULT")
+    print(f"RESULT: {json.dumps(result)}RESULT_END")
     return result
 
 
