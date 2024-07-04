@@ -51,6 +51,7 @@ Instructions:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
 - Do not output anything but the json objects for each identified line of code.
+- Add 'before' or 'after' in the "insertion_point" field if you suggest to insert another line of code. Otherwise, you can omit this field. Use 'after' if another line of code is missing after the problematic line. Use 'before' if another line of code is missing before the problematic line.
 
 # Examples
 Here are examples of how the code could look like and what your response should be:
@@ -65,7 +66,7 @@ def calculate_average(numbers):
     return total / float(count)
 
 def get_element(array, index):
-    return array[index]
+    result = array[index]
 ```
 
 Response:
@@ -78,11 +79,18 @@ Response:
         "insertion_point": "before"
     },
     {
-        "problematic_line_of_code": "return array[index]",
+        "problematic_line_of_code": "result = array[index]",
         "description": "Possible out-of-bound list access",
         "suggestion": "Add a check to ensure the index is within the bounds of the list.",
         "insertion_point": "before"
-    }
+    },
+    {
+        "problematic_line_of_code": "result = array[index]",
+        "description": "Missing return statement.",
+        "suggestion": "Add a return statement in the next line. The function should return the result.",
+        "insertion_point": "after"
+    },
+    
 ]
 ```
 
