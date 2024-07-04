@@ -34,7 +34,7 @@ Here are some criteria for identifying those lines:
     2. **Runtime Errors:** Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
     3. **Common Pitfalls:** Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
     4. **Code Quality Issues:** Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
-    5. **Insertion Points:** Identify lines before or after which additional code should be inserted to fix the bug.
+    5. **Missing Code:** Identify lines before or after which additional code should be inserted to fix the bug.
 
 Instructions:
 
@@ -45,13 +45,12 @@ Instructions:
         - problematic_line_of_code: A substring of the original source code that is relevant for fixing the bug and is unique within the source code. 
         - description: A description why this line is relevant and how it contributes to the bug.
         - suggestion: A suggestion for how to fix or further investigate the issue.
-        - insertion_point: (Optional) Indicates where the additional line of code should be inserted. Possible values are 'above' or 'below'. This field is only required when suggesting to insert a new line of code.
+        - action: Indicates what action should be taken. Possible values are 'change', 'insert_above', or 'insert_below'. Use 'change' if the problematic line itself needs to be modified. Use 'insert_above' if another line of code is missing before the problematic line. Use 'insert_below' if another line of code is missing after the problematic line.
 
 **Important**:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
 - Do not output anything but the json objects for each identified line of code.
-- Add 'below' or 'above' in the "insertion_point" field if you suggest to insert another line of code. Otherwise, you can omit this field. Use 'below' if another line of code is missing after the problematic line. Use 'above' if another line of code is missing before the problematic line.
 
 # Examples
 Here are examples of how the code could look like and what your response should be:
@@ -76,19 +75,19 @@ Response:
         "problematic_line_of_code": "return total / float(count)",
         "description": "Potential division by zero if numbers list is empty",
         "suggestion": "Add a check to ensure count is not zero before performing the division.",
-        "insertion_point": "above"
+        "action": "insert_above"
     },
     {
         "problematic_line_of_code": "result = array[index]",
         "description": "Possible out-of-bound list access",
         "suggestion": "Add a check to ensure the index is within the bounds of the list.",
-        "insertion_point": "above"
+        "action": "insert_above"
     },
     {
         "problematic_line_of_code": "result = array[index]",
         "description": "Missing return statement.",
         "suggestion": "Add a return statement in the next line. The function should return the result.",
-        "insertion_point": "below"
+        "action": "insert_below"
     },
     
 ]
@@ -119,13 +118,16 @@ Response:
 ```json
 [{  "problematic_line_of_code" : "for (int j = 0; j <= numbers.size(); j++) {",
     "description" : "The loop condition is incorrect because j is used as index to numbers. It should be j < numbers.size() instead of j <= numbers.size().",
-    "suggestion" : "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector."},
+    "suggestion" : "Change the loop condition to j < numbers.size() to prevent out of bounds accesses to the vector.",
+    "action": "change"},
     { "problematic_line_of_code" : "int sum = 3;",
     "description" : "It is unusual that the sum variable is initialized to a non-zero value.",
-    "suggestion" : "Change the line to int sum = 0;"},
+    "suggestion" : "Change the line to int sum = 0;",
+    "action": "change"},
     { "problematic_line_of_code" : "product /= numbers[i];",
     "description" : "The operator /= is wrong to calculate a product. It should be *=.",
-    "suggestion" : "Change the operator to *=."}]
+    "suggestion" : "Change the operator to *=.",
+    "action": "change"}]
 ```
 
 ## Example3
@@ -160,18 +162,19 @@ Response:
         "problematic_line_of_code": "return map.get(key);",
         "description": "This may return null if the key does not exist, which may cause a NullPointerException in caller code.",
         "suggestion": "Consider checking if the key exists before returning or return a default value.",
-        "insertion_point": "above"
+        "action": "insert_above"
     },
     {
         "problematic_line_of_code": "int value = map.get(key);",
         "description": "If the key does not exist, map.get(key) returns null, causing a NullPointerException when unboxing to int.",
         "suggestion": "Check if the key exists and initialize value properly.",
-        "insertion_point": "above"
+        "action": "insert_above"
     },
     {
         "problematic_line_of_code": "if (map.get(key) != null)",
         "description": "A more efficient check for key existence is map.containsKey(key).",
-        "suggestion": "Change the condition to if (map.containsKey(key))."
+        "suggestion": "Change the condition to if (map.containsKey(key)).",
+        "action": "change"
     }
 ]
 ```
@@ -210,10 +213,12 @@ Response:
 ```json
 [{  "problematic_line_of_code" : "sum -= numbers[j];",
     "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
-    "suggestion" : "Change the operator to +=."},
+    "suggestion" : "Change the operator to +=.",
+    "action": "change"},
     {"problematic_line_of_code" : "sum -= numbers[j];",
     "description" : "The operator -= is wrong to calculate a sum. It should be +=.",
-    "suggestion" : "Change the operator to +=."}]
+    "suggestion" : "Change the operator to +=.",
+    "action": "change"}]
 ```
 
 # Your Task
@@ -273,7 +278,7 @@ It seems that the last output provided does not contain a valid JSON object. Ple
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>",
-    "insertion_point": (optional) 'above' or 'below'
+    "action": "<'change', 'insert_above' or 'insert_below'>"
   },
 ]
 ```
@@ -301,7 +306,7 @@ It looks like the last output provided is not in the correct JSON format. Parsin
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
-    "insertion_point": (optional) 'above' or 'below'
+    "action": "<'change', 'insert_above' or 'insert_below'>"
   }},
 ]
 ```
