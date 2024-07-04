@@ -45,13 +45,13 @@ Instructions:
         - problematic_line_of_code: A substring of the original source code that is relevant for fixing the bug and is unique within the source code. 
         - description: A description why this line is relevant and how it contributes to the bug.
         - suggestion: A suggestion for how to fix or further investigate the issue.
-        - insertion_point: (Optional) Indicates where the additional code should be inserted. Possible values are 'before' or 'after'. This field is only required when suggesting code insertion.
+        - insertion_point: (Optional) Indicates where the additional line of code should be inserted. Possible values are 'above' or 'below'. This field is only required when suggesting to insert a new line of code.
 
 **Important**:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
 - Make sure each "description" and "suggestion" is relevant to the identified line of code.
 - Do not output anything but the json objects for each identified line of code.
-- Add 'before' or 'after' in the "insertion_point" field if you suggest to insert another line of code. Otherwise, you can omit this field. Use 'after' if another line of code is missing after the problematic line. Use 'before' if another line of code is missing before the problematic line.
+- Add 'below' or 'above' in the "insertion_point" field if you suggest to insert another line of code. Otherwise, you can omit this field. Use 'below' if another line of code is missing after the problematic line. Use 'above' if another line of code is missing before the problematic line.
 
 # Examples
 Here are examples of how the code could look like and what your response should be:
@@ -76,19 +76,19 @@ Response:
         "problematic_line_of_code": "return total / float(count)",
         "description": "Potential division by zero if numbers list is empty",
         "suggestion": "Add a check to ensure count is not zero before performing the division.",
-        "insertion_point": "before"
+        "insertion_point": "above"
     },
     {
         "problematic_line_of_code": "result = array[index]",
         "description": "Possible out-of-bound list access",
         "suggestion": "Add a check to ensure the index is within the bounds of the list.",
-        "insertion_point": "before"
+        "insertion_point": "above"
     },
     {
         "problematic_line_of_code": "result = array[index]",
         "description": "Missing return statement.",
         "suggestion": "Add a return statement in the next line. The function should return the result.",
-        "insertion_point": "after"
+        "insertion_point": "below"
     },
     
 ]
@@ -160,13 +160,13 @@ Response:
         "problematic_line_of_code": "return map.get(key);",
         "description": "This may return null if the key does not exist, which may cause a NullPointerException in caller code.",
         "suggestion": "Consider checking if the key exists before returning or return a default value.",
-        "insertion_point": "before"
+        "insertion_point": "above"
     },
     {
         "problematic_line_of_code": "int value = map.get(key);",
         "description": "If the key does not exist, map.get(key) returns null, causing a NullPointerException when unboxing to int.",
         "suggestion": "Check if the key exists and initialize value properly.",
-        "insertion_point": "before"
+        "insertion_point": "above"
     },
     {
         "problematic_line_of_code": "if (map.get(key) != null)",
@@ -273,7 +273,7 @@ It seems that the last output provided does not contain a valid JSON object. Ple
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>",
-    "insertion_point": (optional) 'before' or 'after'
+    "insertion_point": (optional) 'above' or 'below'
   },
 ]
 ```
@@ -301,7 +301,7 @@ It looks like the last output provided is not in the correct JSON format. Parsin
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
-    "insertion_point": (optional) 'before' or 'after'
+    "insertion_point": (optional) 'above' or 'below'
   }},
 ]
 ```
