@@ -21,20 +21,20 @@ tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(
     model_id, device_map=gpu, torch_dtype=torch.bfloat16
 )
-request_counter=0
+request_counter = 0
 new_prompt = """
 # Task description
-Objective: Identify lines of code that might contain bugs.
+Objective: Identify lines of code that are relevant for fixing bugs.
 
-Context: I have a codebase and I need to find lines that might contain bugs based on specific criteria.
+Context: I have a codebase in which I suspect bug and I need to find lines that are relevant for fixing this bug.
 
-Criteria for Identifying Potential Bugs:
+Here are some criteria for identifying those lines:
 
-    1. **Syntax Errors:** Look for lines with syntax errors.
-    2. **Logical Errors:** Identify lines where the logic might be flawed (e.g., incorrect conditions, improper use of operators).
-    3. **Runtime Errors:** Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
-    4. **Common Pitfalls:** Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
-    5. **Code Quality Issues:** Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
+    1. **Logical Errors:** Identify lines where the logic might be flawed (e.g., incorrect conditions, improper use of operators).
+    2. **Runtime Errors:** Find lines that might cause runtime errors (e.g., null pointer dereferences, out-of-bound array access).
+    3. **Common Pitfalls:** Check for common pitfalls in the language (e.g., off-by-one errors, improper resource management).
+    4. **Code Quality Issues:** Look for lines that deviate from standard coding practices (e.g., poor variable naming, lack of comments, complex expressions).
+    5. **Insertion Points:** Identify lines before or after which additional code should be inserted to fix the bug.
 
 Instructions:
 
@@ -42,9 +42,10 @@ Instructions:
     2. Make sure to check for edge cases and scenarios where the input might cause unexpected behavior.
     3. Pay attention to lines with complex logic or multiple operations as they are more prone to errors.
     4. For each identified line, provide a json object with the following fields:
-        - problematic_line_of_code: A substring of the original source code that contains the bug and is unique within the source code. 
-        - description: A description of the potential bug.
+        - problematic_line_of_code: A substring of the original source code that is relevant for fixing the bug and is unique within the source code. 
+        - description: A description why this line is relevant and how it contributes to the bug.
         - suggestion: A suggestion for how to fix or further investigate the issue.
+        - insertion_point: (Optional) Indicates where the additional code should be inserted. Possible values are 'before' or 'after'. This field is only required when suggesting code insertion.
 
 **Important**:
 - Use exact substrings from the original code in the "problematic_line_of_code" field to ensure they can be unambiguously matched using the Python `find` method.
@@ -73,12 +74,14 @@ Response:
     {
         "problematic_line_of_code": "return total / float(count)",
         "description": "Potential division by zero if numbers list is empty",
-        "suggestion": "Add a check to ensure count is not zero before performing the division."
+        "suggestion": "Add a check to ensure count is not zero before performing the division.",
+        "insertion_point": "before"
     },
     {
         "problematic_line_of_code": "return array[index]",
         "description": "Possible out-of-bound list access",
-        "suggestion": "Add a check to ensure the index is within the bounds of the list."
+        "suggestion": "Add a check to ensure the index is within the bounds of the list.",
+        "insertion_point": "before"
     }
 ]
 ```
@@ -148,12 +151,14 @@ Response:
     {
         "problematic_line_of_code": "return map.get(key);",
         "description": "This may return null if the key does not exist, which may cause a NullPointerException in caller code.",
-        "suggestion": "Consider checking if the key exists before returning or return a default value."
+        "suggestion": "Consider checking if the key exists before returning or return a default value.",
+        "insertion_point": "before"
     },
     {
         "problematic_line_of_code": "int value = map.get(key);",
         "description": "If the key does not exist, map.get(key) returns null, causing a NullPointerException when unboxing to int.",
-        "suggestion": "Check if the key exists and initialize value properly."
+        "suggestion": "Check if the key exists and initialize value properly.",
+        "insertion_point": "before"
     },
     {
         "problematic_line_of_code": "if (map.get(key) != null)",
@@ -259,7 +264,8 @@ It seems that the last output provided does not contain a valid JSON object. Ple
   {
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
-    "suggestion": "<suggestion for fixing or investigating the issue>"
+    "suggestion": "<suggestion for fixing or investigating the issue>",
+    "insertion_point": (optional) 'before' or 'after'
   },
 ]
 ```
@@ -287,6 +293,7 @@ It looks like the last output provided is not in the correct JSON format. Parsin
     "problematic_line_of_code": "<line of code>",
     "description": "<description of the potential bug>",
     "suggestion": "<suggestion for fixing or investigating the issue>"
+    "insertion_point": (optional) 'before' or 'after'
   }},
 ]
 ```
@@ -360,7 +367,7 @@ async def highlight_code(prompt: Prompt):
         },
     ]
     global request_counter
-    print(f'Handling prompt {request_counter} with\nCODE:{prompt.code}CODE')
+    print(f"Handling prompt {request_counter} with\nCODE:{prompt.code}CODE")
     request_counter += 1
     result = recursive_prompting(0, chat, prompt.code)
     print(f"RESULT: {json.dumps(result)}RESULT_END")
