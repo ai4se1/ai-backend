@@ -10,6 +10,7 @@ import copy
 class Prompt(BaseModel):
     code: str
     language: str
+    context: str
 
 
 app = FastAPI()
@@ -225,8 +226,7 @@ Response:
 
 Please review the code below and use the formatting of the examples to provide your response as a list of JSON objects.
 
-Code:
-```
+
 """
 
 max_new_tokens = 1500
@@ -373,10 +373,21 @@ Please analyze the code again and make sure that each identified "problematic_li
 
 @app.post("/highlight-code/")
 async def highlight_code(prompt: Prompt):
+    content = new_prompt
+    if prompt.context:
+        content = (
+            content
+            + "Here is some additional context about what the code should do:\n ```\n"
+            + prompt.context
+            + "\n```\n"
+        )
+
+    content = content + "\nCode:\n```" + prompt.language + "\n" + prompt.code + "\n```"
+
     chat = [
         {
             "role": "user",
-            "content": new_prompt + prompt.language + "\n" + prompt.code + "\n```",
+            "content": content,
         },
     ]
     global request_counter
