@@ -10,7 +10,8 @@ import copy
 class Prompt(BaseModel):
     code: str
     language: str
-    context: str
+    context: str = ""
+    debugState: str = ""
 
 
 app = FastAPI()
@@ -225,8 +226,6 @@ Response:
 # Your Task
 
 Please review the code below and use the formatting of the examples to provide your response as a list of JSON objects.
-
-
 """
 
 max_new_tokens = 1500
@@ -374,15 +373,24 @@ Please analyze the code again and make sure that each identified "problematic_li
 @app.post("/highlight-code/")
 async def highlight_code(prompt: Prompt):
     content = new_prompt
+    content = content + "\nCode:\n```" + prompt.language + "\n" + prompt.code + "\n```"
+
     if prompt.context:
         content = (
             content
-            + "Here is some additional context about what the code should do:\n ```\n"
+            + "Here is some additional context about what the code should do:\n"
             + prompt.context
-            + "\n```\n"
+            + "\n"
         )
 
-    content = content + "\nCode:\n```" + prompt.language + "\n" + prompt.code + "\n```"
+    if prompt.debugState:
+        print(prompt.debugState)
+        content = (
+            content
+            + "Here is JSON object that describes the dynamic program state.\n ```json\n"
+            + prompt.debugState
+            + "\n```\nThe current line describes where the program is halted. The stackFrames attribute is a list of the names of the stack frames. The globalVariables attribute contains information about the global variables. The localVariables attribute contains information about all local variables. Please take this information into account when identifying bugs.\n"
+        )
 
     chat = [
         {
